@@ -115,7 +115,7 @@ const Survey = () => {
       question: "Qual a sua vibe para o próximo evento no Arena BRB?",
       options: [
         "Amei!",
-        "Ja adquiri meu próximo ingresso",
+        "Já adquiri meu próximo ingresso",
         "Não voltarei"
       ],
     },
