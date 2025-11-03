@@ -7,12 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Sprout, ChevronRight, CheckCircle2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Survey = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showFinal, setShowFinal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const questions: Array<{
     id: number;
@@ -132,11 +136,114 @@ const Survey = () => {
     setAnswers({ ...answers, [currentQuestion]: value });
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
-      setShowFinal(true);
+      // Save survey responses to database
+      setIsSubmitting(true);
+      
+      try {
+        // Create respondent profile
+        const { data: respondentData, error: respondentError } = await supabase
+          .from("dim_respondent")
+          .insert({
+            gender: answers[0],
+            age_band: answers[1],
+            transport_mode: answers[3],
+          })
+          .select()
+          .single();
+
+        if (respondentError) throw respondentError;
+
+        // Get a valid event (preferably matching the event type from question 2)
+        const { data: events, error: eventsError } = await supabase
+          .from("dim_event")
+          .select("*")
+          .eq("event_type", answers[2])
+          .limit(1);
+
+        if (eventsError) throw eventsError;
+
+        // If no event matches the type, get any event
+        let eventId = events?.[0]?.event_id;
+        if (!eventId) {
+          const { data: anyEvent } = await supabase
+            .from("dim_event")
+            .select("event_id")
+            .limit(1)
+            .single();
+          eventId = anyEvent?.event_id;
+        }
+
+        if (!eventId) {
+          throw new Error("Nenhum evento encontrado no sistema");
+        }
+
+        // Prepare responses for insertion
+        const responses = [
+          {
+            event_id: eventId,
+            respondent_id: respondentData.respondent_id,
+            question_id: "nps",
+            answer_numeric: parseFloat(answers[4]),
+            answer_value: answers[4],
+          },
+          {
+            event_id: eventId,
+            respondent_id: respondentData.respondent_id,
+            question_id: "wayfinding_ease",
+            answer_value: answers[5],
+          },
+          {
+            event_id: eventId,
+            respondent_id: respondentData.respondent_id,
+            question_id: "trophy",
+            answer_value: answers[6],
+          },
+          {
+            event_id: eventId,
+            respondent_id: respondentData.respondent_id,
+            question_id: "frustration",
+            answer_value: answers[7],
+          },
+          {
+            event_id: eventId,
+            respondent_id: respondentData.respondent_id,
+            question_id: "vibe",
+            answer_value: answers[8],
+          },
+          {
+            event_id: eventId,
+            respondent_id: respondentData.respondent_id,
+            question_id: "next_artist",
+            answer_value: answers[9],
+          },
+        ];
+
+        const { error: responsesError } = await supabase
+          .from("fct_response")
+          .insert(responses);
+
+        if (responsesError) throw responsesError;
+
+        toast({
+          title: "Pesquisa enviada com sucesso!",
+          description: "Sua contribuição ajudará a plantar mais árvores.",
+        });
+
+        setShowFinal(true);
+      } catch (error) {
+        console.error("Erro ao salvar pesquisa:", error);
+        toast({
+          title: "Erro ao enviar pesquisa",
+          description: "Por favor, tente novamente.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -270,9 +377,11 @@ const Survey = () => {
             size="lg"
             className="w-full text-lg h-14 bg-gradient-to-r from-primary to-accent hover:opacity-90"
             onClick={handleNext}
-            disabled={!canProceed}
+            disabled={!canProceed || isSubmitting}
           >
-            {currentQuestion < questions.length - 1 ? (
+            {isSubmitting ? (
+              "Enviando..."
+            ) : currentQuestion < questions.length - 1 ? (
               <>
                 Próxima Pergunta
                 <ChevronRight className="ml-2 h-5 w-5" />
