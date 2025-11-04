@@ -55,7 +55,7 @@ export function calculateKPIs(responses: any[], quality: any[], events: any[]) {
     delayHours: {
       value: avgDelay,
     },
-    sampleSize: responses.length,
+    sampleSize: new Set(responses.map(r => r.respondent_id)).size,
   };
 }
 
@@ -173,7 +173,11 @@ export function calculateSegments(responses: any[], events: any[]) {
     const totalWay = wayfindingResponses.length || 1;
     const netEase = Math.round(((easy - difficult) / totalWay) * 100);
 
-    return { nps, netEase, count: segmentResponses.length };
+    return {
+      nps,
+      netEase,
+      count: new Set(segmentResponses.map(r => r.respondent_id)).size
+    };
   };
 
   // Group by event type
