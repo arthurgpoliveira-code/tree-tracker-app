@@ -19,15 +19,17 @@ const Results = () => {
   const progressToNext = responses % 100;
   const remainingToNext = 100 - progressToNext;
 
-  // Buscar contagem real de respostas e atualizar em tempo real
+  // Buscar contagem real de pesquisas completas e atualizar em tempo real
   useEffect(() => {
     const fetchResponseCount = async () => {
-      const { count } = await supabase
+      // Contar respondentes únicos ao invés de respostas individuais
+      const { data, error } = await supabase
         .from("fct_response")
-        .select("*", { count: "exact", head: true });
+        .select("respondent_id");
       
-      if (count !== null) {
-        setResponses(count);
+      if (data && !error) {
+        const uniqueRespondents = new Set(data.map(r => r.respondent_id)).size;
+        setResponses(uniqueRespondents);
       }
     };
 
@@ -97,7 +99,7 @@ const Results = () => {
               <div className="text-center space-y-2">
                 <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
                   <Users className="h-4 w-4" />
-                  <span>Respostas até agora</span>
+                  <span>Pesquisas completas até agora</span>
                 </div>
                 <div className="text-7xl font-bold bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent animate-pulse-soft">
                   {responses}
@@ -119,7 +121,7 @@ const Results = () => {
                 <p className="text-center text-sm text-muted-foreground">
                   Faltam apenas{" "}
                   <span className="font-bold text-primary">
-                    {remainingToNext} respostas
+                    {remainingToNext} pesquisas
                   </span>{" "}
                   para a próxima árvore! 🌳
                 </p>
