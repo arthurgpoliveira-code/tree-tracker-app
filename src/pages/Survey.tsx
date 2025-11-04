@@ -157,28 +157,59 @@ const Survey = () => {
 
         if (respondentError) throw respondentError;
 
-        // Get a valid event (preferably matching the event type from question 2)
-        const { data: events, error: eventsError } = await supabase
+        // Get or create a valid event
+        let eventId;
+        
+        // Try to get existing event matching the type
+        const { data: events } = await supabase
           .from("dim_event")
-          .select("*")
+          .select("event_id")
           .eq("event_type", answers[2])
           .limit(1);
 
-        if (eventsError) throw eventsError;
-
-        // If no event matches the type, get any event
-        let eventId = events?.[0]?.event_id;
-        if (!eventId) {
+        if (events && events.length > 0) {
+          eventId = events[0].event_id;
+        } else {
+          // Try to get any existing event
           const { data: anyEvent } = await supabase
             .from("dim_event")
             .select("event_id")
             .limit(1)
-            .single();
-          eventId = anyEvent?.event_id;
+            .maybeSingle();
+          
+          if (anyEvent) {
+            eventId = anyEvent.event_id;
+          }
         }
 
+        // If still no event, create a default one
         if (!eventId) {
-          throw new Error("Nenhum evento encontrado no sistema");
+          const eventTypeMap: Record<string, string> = {
+            "Shows/Festivais": "shows/festivais",
+            "Evento Executivo": "executivo",
+            "Jogo de futebol": "futebol",
+            "Evento infantil": "infantil",
+            "Tour guiado": "tour"
+          };
+          
+          const { data: newEvent, error: createError } = await supabase
+            .from("dim_event")
+            .insert({
+              event_code: `EVT${Date.now()}`,
+              name: `${answers[2]} - Arena BRB`,
+              event_date: new Date().toISOString().split('T')[0],
+              event_type: eventTypeMap[answers[2]] || "tour",
+              capacity: 1000,
+            })
+            .select("event_id")
+            .single();
+
+          if (createError) {
+            console.error("Erro ao criar evento:", createError);
+            throw new Error("Não foi possível criar evento para a pesquisa");
+          }
+          
+          eventId = newEvent.event_id;
         }
 
         // Prepare responses for insertion
