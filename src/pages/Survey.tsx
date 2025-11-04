@@ -17,6 +17,7 @@ const Survey = () => {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showFinal, setShowFinal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
 
   const questions: Array<{
     id: number;
@@ -140,8 +141,14 @@ const Survey = () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
+      // Prevent double submission
+      if (isSubmitting || hasSubmitted) {
+        return;
+      }
+      
       // Save survey responses to database
       setIsSubmitting(true);
+      setHasSubmitted(true);
       
       try {
         // Create respondent profile
