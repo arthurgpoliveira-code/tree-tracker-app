@@ -2,23 +2,23 @@
 
 export function calculateKPIs(responses: any[], quality: any[], events: any[]) {
   // NPS Calculation
-  const npsResponses = responses.filter((r) => r.question_id === "Q5" && r.answer_numeric !== null);
+  const npsResponses = responses.filter((r) => r.question_id === "nps" && r.answer_numeric !== null);
   const promoters = npsResponses.filter((r) => r.answer_numeric >= 9).length;
   const detractors = npsResponses.filter((r) => r.answer_numeric <= 6).length;
   const total = npsResponses.length || 1;
   const npsValue = Math.round(((promoters - detractors) / total) * 100);
 
   // Net Ease Calculation
-  const wayfindingResponses = responses.filter((r) => r.question_id === "Q6" && r.answer_numeric !== null);
-  const easy = wayfindingResponses.filter((r) => r.answer_numeric <= 2).length;
-  const difficult = wayfindingResponses.filter((r) => r.answer_numeric >= 4).length;
+  const wayfindingResponses = responses.filter((r) => r.question_id === "wayfinding_ease" && r.answer_value !== null);
+  const easy = wayfindingResponses.filter((r) => r.answer_value === "Fácil" || r.answer_value === "Muito Fácil").length;
+  const difficult = wayfindingResponses.filter((r) => r.answer_value === "Difícil" || r.answer_value === "Muito Difícil").length;
   const totalWay = wayfindingResponses.length || 1;
   const netEaseValue = Math.round(((easy - difficult) / totalWay) * 100);
 
   // Vibe Calculation
-  const vibeResponses = responses.filter((r) => r.question_id === "Q9" && r.answer_value);
+  const vibeResponses = responses.filter((r) => r.question_id === "vibe" && r.answer_value);
   const positive = vibeResponses.filter(
-    (r) => r.answer_value === "Já adquiri ingresso para próximo evento" || r.answer_value === "Com certeza voltarei"
+    (r) => r.answer_value === "Já comprei!" || r.answer_value === "Amei!"
   ).length;
   const totalVibe = vibeResponses.length || 1;
   const vibeValue = Math.round((positive / totalVibe) * 100);
@@ -60,8 +60,8 @@ export function calculateKPIs(responses: any[], quality: any[], events: any[]) {
 }
 
 export function calculateMatrix(responses: any[]) {
-  const npsResponses = responses.filter((r) => r.question_id === "Q5");
-  const vibeResponses = responses.filter((r) => r.question_id === "Q9");
+  const npsResponses = responses.filter((r) => r.question_id === "nps");
+  const vibeResponses = responses.filter((r) => r.question_id === "vibe");
 
   const respondentsWithBoth = Array.from(
     new Set(
@@ -82,7 +82,7 @@ export function calculateMatrix(responses: any[]) {
 
     const highNPS = nps >= 7;
     const highVibe =
-      vibe === "Já adquiri ingresso para próximo evento" || vibe === "Com certeza voltarei";
+      vibe === "Já comprei!" || vibe === "Amei!";
 
     if (highVibe && highNPS) matrix.highVibeHighNPS.count++;
     else if (highVibe && !highNPS) matrix.highVibeLowNPS.count++;
@@ -99,16 +99,16 @@ export function calculateMatrix(responses: any[]) {
 }
 
 export function calculateDrivers(responses: any[]) {
-  const trophiesResponses = responses.filter((r) => r.question_id === "Q7" && r.answer_array);
-  const frustrationsResponses = responses.filter((r) => r.question_id === "Q8" && r.answer_array);
+  const trophiesResponses = responses.filter((r) => r.question_id === "trophy" && r.answer_value);
+  const frustrationsResponses = responses.filter((r) => r.question_id === "frustration" && r.answer_value);
 
   const countItems = (responses: any[]) => {
     const counts: Record<string, number> = {};
     responses.forEach((r) => {
-      const items = r.answer_array || [];
-      items.forEach((item: string) => {
-        counts[item] = (counts[item] || 0) + 1;
-      });
+      const value = r.answer_value;
+      if (value) {
+        counts[value] = (counts[value] || 0) + 1;
+      }
     });
     return counts;
   };
@@ -141,13 +141,21 @@ export function calculateDrivers(responses: any[]) {
 }
 
 export function calculateWayfinding(responses: any[]) {
-  const wayfindingResponses = responses.filter((r) => r.question_id === "Q6" && r.answer_numeric !== null);
+  const wayfindingResponses = responses.filter((r) => r.question_id === "wayfinding_ease" && r.answer_value);
 
-  const distribution = [1, 2, 3, 4, 5].map((score) => {
-    const count = wayfindingResponses.filter((r) => r.answer_numeric === score).length;
+  const scoreMap: Record<string, string> = {
+    "Muito Fácil": "1",
+    "Fácil": "2",
+    "Neutro": "3",
+    "Difícil": "4",
+    "Muito Difícil": "5"
+  };
+
+  const distribution = ["Muito Fácil", "Fácil", "Neutro", "Difícil", "Muito Difícil"].map((label) => {
+    const count = wayfindingResponses.filter((r) => r.answer_value === label).length;
     const percentage = wayfindingResponses.length > 0 ? Math.round((count / wayfindingResponses.length) * 100) : 0;
     return {
-      label: `${score}`,
+      label: scoreMap[label],
       count,
       percentage,
     };
@@ -161,15 +169,15 @@ export function calculateWayfinding(responses: any[]) {
 
 export function calculateSegments(responses: any[], events: any[]) {
   const calculateSegmentMetrics = (segmentResponses: any[]) => {
-    const npsResponses = segmentResponses.filter((r) => r.question_id === "Q5" && r.answer_numeric !== null);
+    const npsResponses = segmentResponses.filter((r) => r.question_id === "nps" && r.answer_numeric !== null);
     const promoters = npsResponses.filter((r) => r.answer_numeric >= 9).length;
     const detractors = npsResponses.filter((r) => r.answer_numeric <= 6).length;
     const totalNPS = npsResponses.length || 1;
     const nps = Math.round(((promoters - detractors) / totalNPS) * 100);
 
-    const wayfindingResponses = segmentResponses.filter((r) => r.question_id === "Q6" && r.answer_numeric !== null);
-    const easy = wayfindingResponses.filter((r) => r.answer_numeric <= 2).length;
-    const difficult = wayfindingResponses.filter((r) => r.answer_numeric >= 4).length;
+    const wayfindingResponses = segmentResponses.filter((r) => r.question_id === "wayfinding_ease" && r.answer_value);
+    const easy = wayfindingResponses.filter((r) => r.answer_value === "Fácil" || r.answer_value === "Muito Fácil").length;
+    const difficult = wayfindingResponses.filter((r) => r.answer_value === "Difícil" || r.answer_value === "Muito Difícil").length;
     const totalWay = wayfindingResponses.length || 1;
     const netEase = Math.round(((easy - difficult) / totalWay) * 100);
 
@@ -205,14 +213,14 @@ export function calculateSegments(responses: any[], events: any[]) {
 }
 
 export function calculatePreferences(responses: any[]) {
-  const preferencesResponses = responses.filter((r) => r.question_id === "Q10" && r.answer_array);
+  const preferencesResponses = responses.filter((r) => r.question_id === "next_artist" && r.answer_value);
 
   const counts: Record<string, number> = {};
   preferencesResponses.forEach((r) => {
-    const items = r.answer_array || [];
-    items.forEach((item: string) => {
-      counts[item] = (counts[item] || 0) + 1;
-    });
+    const value = r.answer_value;
+    if (value) {
+      counts[value] = (counts[value] || 0) + 1;
+    }
   });
 
   return Object.entries(counts)
